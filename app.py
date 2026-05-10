@@ -1,50 +1,40 @@
-﻿
+import streamlit as st
 import whisper
-import gradio as gr
 from deep_translator import GoogleTranslator
-import torch
+import os
 
-# التحقق من تفعيل GPU
-device = "cuda" if torch.cuda.is_available() else "cpu"
-print(f"النظام يعمل الآن باستخدام: {device}")
+st.set_page_config(page_title="نظام USUR للترجمة", page_icon="💠")
 
-# تحميل موديل medium (التوازن المثالي)
-# يتم تحميله على الـ GPU مباشرة لسرعة المعالجة
-model = whisper.load_model("medium").to(device)
+st.title("💠 نظام USUR: تحويل وترجمة الوسائط")
 
-def usur_optimized_process(audio_file, target_lang):
-    if audio_file is None:
-        return "⚠️ يرجى رفع ملف أولاً", ""
+@st.cache_resource
+def load_model():
+    return whisper.load_model("base")
+
+model = load_model()
+
+uploaded_file = st.file_uploader("ارفع ملف صوت أو فيديو", type=["mp3", "wav", "m4a", "mp4"])
+
+if uploaded_file is not None:
+    with open("temp_file", "wb") as f:
+        f.write(uploaded_file.getbuffer())
     
-    # معالجة الصوت باستخدام GPU
-    # FP16=True تسرع العملية جداً على كروت الشاشة
-    result = model.transcribe(audio_file, language='ar', fp16=True)
-    original_text = result['text'].strip()
-    
-    # الترجمة
-    lang_map = {"العربية": "ar", "English": "en", "Urdu": "ur", "French": "fr"}
-    try:
-        translated_text = GoogleTranslator(source='auto', target=lang_map[target_lang]).translate(original_text)
-    except:
-        translated_text = "خطأ في الاتصال بمحرك الترجمة."
+    st.success("✅ تم رفع الملف")
+
+    if st.button("🎙️ استخراج النص والترجمة"):
+        with st.spinner("جاري المعالجة..."):
+            # استخراج النص
+            result = model.transcribe("temp_file")
+            text = result['text']
+            st.session_state['text'] = text
+            
+            # الترجمة للعربية تلقائياً
+            translated = GoogleTranslator(source='auto', target='ar').translate(text)
+            st.session_state['translated'] = translated
+
+    if 'text' in st.session_state:
+        st.subheader("النص الأصلي:")
+        st.write(st.session_state['text'])
         
-    return original_text, translated_text
-
-# الواجهة
-with gr.Blocks(theme=gr.themes.Soft()) as demo:
-    gr.Markdown("# 💠 نظام USUR فائق السرعة (Turbo GPU)")
-    gr.Markdown(f"المحرك الحالي: **Medium Model** | المعالج: **{device.upper()}**")
-    
-    with gr.Row():
-        audio_input = gr.Audio(type="filepath", label="ارفع ملفك (صوت أو فيديو)")
-        target_lang = gr.Dropdown(choices=["العربية", "English", "Urdu", "French"], value="English", label="لغة الترجمة")
-    
-    btn = gr.Button("🚀 بدء المعالجة الفورية", variant="primary")
-    
-    with gr.Row():
-        out_original = gr.Textbox(label="النص المستخرج بدقة", lines=12, show_copy_button=True)
-        out_translated = gr.Textbox(label="الترجمة المعتمدة", lines=12, show_copy_button=True)
-    
-    btn.click(usur_optimized_process, inputs=[audio_input, target_lang], outputs=[out_original, out_translated])
-
-demo.launch(share=True)
+        st.subheader("الترجمة العربية:")
+        st.write(st.session_state['translated'])
