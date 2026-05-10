@@ -13,7 +13,7 @@ def load_model():
 
 model = load_model()
 
-uploaded_file = st.file_uploader("ارفع ملف صوت أو فيديو", type=["mp3", "wav", "m4a", "mp4"])
+uploaded_file = st.file_uploader("ارفع ملف صوت أو فيديو", type=["mp3", "wav", "m4a", "mp4", "amr", "opus"])
 
 if uploaded_file is not None:
     with open("temp_file", "wb") as f:
